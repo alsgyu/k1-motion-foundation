@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-
 #include "brain.h"
 #include "utils/print.h"
 #include "utils/math.h"
@@ -31,6 +30,7 @@ void Brain::init()
     // Subscribe to essential topics only
     detectionsSubscription = create_subscription<vision_interface::msg::Detections>("/booster_vision/detection", 1, bind(&Brain::detectionsCallback, this, _1));
     lowStateSubscription = create_subscription<booster_interface::msg::LowState>("/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
+    odometerSubscription = create_subscription<booster_interface::msg::Odometer>("/booster_motion/odometer", 1, bind(&Brain::odometerCallback, this, _1));
 }
 
 void Brain::loadConfig()
@@ -46,19 +46,43 @@ void Brain::tick()
     tree->tick();
 }
 
+
 void Brain::updateBallMemory()
 {
-    data->ball.range = sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x + data->ball.posToRobot.y * data->ball.posToRobot.y);
-    tree->setEntry<double>("ball_range", data->ball.range);
-    data->ball.yawToRobot = atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
-    data->ball.pitchToRobot = asin(config->robotHeight / data->ball.range);
 
-    // mark ball as lost if long time no see
-    if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength)
-    {
+    double secs = msecsSince(data->ball.timePoint) / 1000;
+    
+    double ballMemTimeout;
+    get_parameter("strategy.ball_memory_timeout", ballMemTimeout);
+
+    if (secs > ballMemTimeout) 
+    { 
         tree->setEntry<bool>("ball_location_known", false);
-        data->ballDetected = false;
+        tree->setEntry<bool>("ball_out", false); 
     }
+
+    
+    updateRelativePos(data->ball);
+    updateRelativePos(data->tmBall);
+    tree->setEntry<double>("ball_range", data->ball.range);
+
+
+
+    log->setTimeNow();
+    log->logBall(
+        "field/ball", 
+        data->ball.posToField, 
+        data->ballDetected ? 0x00FF00FF : 0x006600FF,
+        data->ballDetected,
+        tree->getEntry<bool>("ball_location_known")
+        );
+    log->logBall(
+        "field/tmBall", 
+        data->tmBall.posToField, 
+        0xFFFF00FF,
+        tree->getEntry<bool>("tm_ball_pos_reliable"),
+        tree->getEntry<bool>("tm_ball_pos_reliable")
+        );
 }
 
 void Brain::detectionsCallback(const vision_interface::msg::Detections &msg)
@@ -80,6 +104,19 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
 {
     data->headYaw = msg.motor_state_serial[0].q;
     data->headPitch = msg.motor_state_serial[1].q;
+}
+
+void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
+{
+    data->robotPoseToOdom.x = msg.x * config->robotOdomFactor;
+    data->robotPoseToOdom.y = msg.y * config->robotOdomFactor;
+    data->robotPoseToOdom.theta = msg.theta;
+
+    // Update robot position in Field coordinates based on Odom info
+    transCoord(
+        data->robotPoseToOdom.x, data->robotPoseToOdom.y, data->robotPoseToOdom.theta,
+        data->odomToField.x, data->odomToField.y, data->odomToField.theta,
+        data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta);
 }
 
 vector<GameObject> Brain::getGameObjects(const vision_interface::msg::Detections &detections)
@@ -164,4 +201,5 @@ void Brain::detectProcessBalls(const vector<GameObject> &ballObjs)
         data->ball.boundingBox.ymax = 0;
         data->ball.confidence = 0;
     }
+
 }

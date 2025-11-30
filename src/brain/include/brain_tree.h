@@ -170,7 +170,6 @@ private:
     double _dir = 1.0; // 1.0 circle back from left, -1.0  circle back from right
 };
 
-// After approaching the ball, adjust to the appropriate kicking angle for offense or defense.
 class Adjust : public SyncActionNode
 {
 public:
@@ -179,13 +178,18 @@ public:
     static PortsList providedPorts()
     {
         return {
-            InputPort<double>("turn_threshold", 0.2, "If the angle to the ball exceeds this value, the robot will first turn to face the ball"),
-            InputPort<double>("vx_limit", 0.1, "Limit for vx during adjustment, [-limit, limit]"),
-            InputPort<double>("vy_limit", 0.1, "Limit for vy during adjustment, [-limit, limit]"),
-            InputPort<double>("vtheta_limit", 0.4, "Limit for vtheta during adjustment, [-limit, limit]"),
-            InputPort<double>("max_range", 1.5, "When the ball range exceeds this value, move slightly forward"),
-            InputPort<double>("min_range", 1.0, "When the ball range is smaller than this value, move slightly backward"),
-            InputPort<string>("position", "offense", "offense | defense, determines which direction to kick the ball"),
+            InputPort<double>("turn_threshold", 3.25, "球的角度大于这个值, 机器人先转身面向球, 直线运动先暂停"),
+            InputPort<double>("vx_limit", 0.05, "调整过过程中 vx 的限制 [-limit, limit]"),
+            InputPort<double>("vy_limit", 0.05, "调整过过程中 vy 的限制 [-limit, limit]"),
+            InputPort<double>("vtheta_limit", 0.1, "调整过过程中 vtheta 的限制 [-limit, limit]"),
+            InputPort<double>("range", 2.25, "ball  range 保持这个值"),
+            InputPort<double>("vtheta_factor", 3.0, "调整角度时, vtheta 的乘数, 越大转向越快"),
+            InputPort<double>("tangential_speed_far", 0.2, "调整角度时, 较远时的切线速度"),
+            InputPort<double>("tangential_speed_near", 0.15, "调整角度时, 较近时的切线速度"),
+            InputPort<double>("near_threshold", 0.8, "距离目标小于这个值时, 使用 near speed"),
+            InputPort<double>("no_turn_threshold", 0.1, "角度差小于这个值时, 不转身"), //
+            InputPort<double>("turn_first_threshold", 0.5, "角度差大于这个值时, 先转身, 不移动"), //
+
         };
     }
 
