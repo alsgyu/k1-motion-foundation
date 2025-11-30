@@ -31,6 +31,7 @@ void Brain::init()
     // Subscribe to essential topics only
     detectionsSubscription = create_subscription<vision_interface::msg::Detections>("/booster_vision/detection", 1, bind(&Brain::detectionsCallback, this, _1));
     lowStateSubscription = create_subscription<booster_interface::msg::LowState>("/low_state", 1, bind(&Brain::lowStateCallback, this, _1));
+    odometerSubscription = create_subscription<booster_interface::msg::Odometer>("/booster_motion/odometer", 1, bind(&Brain::odometerCallback, this, _1));
 }
 
 void Brain::loadConfig()
@@ -80,6 +81,19 @@ void Brain::lowStateCallback(const booster_interface::msg::LowState &msg)
 {
     data->headYaw = msg.motor_state_serial[0].q;
     data->headPitch = msg.motor_state_serial[1].q;
+}
+
+void Brain::odometerCallback(const booster_interface::msg::Odometer &msg)
+{
+    data->robotPoseToOdom.x = msg.x * config->robotOdomFactor;
+    data->robotPoseToOdom.y = msg.y * config->robotOdomFactor;
+    data->robotPoseToOdom.theta = msg.theta;
+
+    // Update robot position in Field coordinates based on Odom info
+    transCoord(
+        data->robotPoseToOdom.x, data->robotPoseToOdom.y, data->robotPoseToOdom.theta,
+        data->odomToField.x, data->odomToField.y, data->odomToField.theta,
+        data->robotPoseToField.x, data->robotPoseToField.y, data->robotPoseToField.theta);
 }
 
 vector<GameObject> Brain::getGameObjects(const vision_interface::msg::Detections &detections)

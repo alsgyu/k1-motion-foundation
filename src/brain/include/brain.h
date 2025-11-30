@@ -5,6 +5,7 @@
 #include <vision_interface/msg/detections.hpp>
 
 #include "booster_interface/msg/low_state.hpp"
+#include "booster_interface/msg/odometer.hpp"
 
 #include "brain_config.h"
 #include "brain_data.h"
@@ -35,10 +36,16 @@ private:
     // Essential callbacks only
     void detectionsCallback(const vision_interface::msg::Detections &msg);
     void lowStateCallback(const booster_interface::msg::LowState &msg);
+    void odometerCallback(const booster_interface::msg::Odometer &msg);
     
     vector<GameObject> getGameObjects(const vision_interface::msg::Detections &msg);
     void detectProcessBalls(const vector<GameObject> &ballObjs);
+    
+    // Helper functions
+    void updateFieldPos(GameObject &obj);
+    double msecsSince(rclcpp::Time time);
 
     rclcpp::Subscription<vision_interface::msg::Detections>::SharedPtr detectionsSubscription;
     rclcpp::Subscription<booster_interface::msg::LowState>::SharedPtr lowStateSubscription;
+    rclcpp::Subscription<booster_interface::msg::Odometer>::SharedPtr odometerSubscription;
 };

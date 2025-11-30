@@ -28,6 +28,7 @@ void BrainTree::init()
     REGISTER_BUILDER(CamTrackBall)
     REGISTER_BUILDER(CamFindBall)
     REGISTER_BUILDER(CamScanField)
+    REGISTER_BUILDER(Adjust)
 
     factory.registerBehaviorTreeFromFile(brain->config->treeFilePath);
     tree = factory.createTree("MainTree");
@@ -161,6 +162,63 @@ NodeStatus CamScanField::tick()
     double yaw = cycleTime < (msecCycle / 2.0) ? (leftYaw - rightYaw) * (2.0 * cycleTime / msecCycle) + rightYaw : (leftYaw - rightYaw) * (2.0 * (msecCycle - cycleTime) / msecCycle) + rightYaw;
 
     brain->client->moveHead(pitch, yaw);
+    return NodeStatus::SUCCESS;
+}
+
+// Simplified Adjust implementation for kick alignment
+NodeStatus Adjust::tick()
+{
+    if (!brain->tree->getEntry<bool>("ball_location_known"))
+    {
+        return NodeStatus::SUCCESS;
+    }
+
+    // Get input parameters (simplified version from refer/brain_tree.cpp)
+    double vxLimit, vyLimit, vthetaLimit, maxRange, minRange;
+    getInput("vx_limit", vxLimit);
+    getInput("vy_limit", vyLimit);
+    getInput("vtheta_limit", vthetaLimit);
+    getInput("max_range", maxRange);
+    getInput("min_range", minRange);
+    
+    string position;
+    getInput("position", position);
+
+    double vx = 0, vy = 0, vtheta = 0;
+    
+    // Calculate kick direction (simplified - just kick forward for offense, backwards for defense)
+    double kickDir = (position == "defense") ? 
+        atan2(brain->data->ball.posToField.y, brain->data->ball.posToField.x + 4.5) :  // towards own goal
+        atan2(-brain->data->ball.posToField.y, 4.5 - brain->data->ball.posToField.x);  // towards opponent goal
+    
+    // Calculate robot-ball angle in field frame
+    double dir_rb_f = atan2(
+        brain->data->ball.posToField.y - brain->data->robotPoseToField.y,
+        brain->data->ball.posToField.x - brain->data->robotPoseToField.x
+    );
+    
+    double deltaDir = toPInPI(kickDir - dir_rb_f);
+    double dir = deltaDir > 0 ? -1.0 : 1.0;  // Circle direction
+    double ballRange = brain->data->ball.range;
+    double ballYaw = brain->data->ball.yawToRobot;
+
+    // Circular trajectory around the ball
+    double s = 0.4;  // tangential speed
+    double r = 0.8;  // turning rate
+    vx = -s * dir * sin(ballYaw);
+    if (ballRange > maxRange)
+        vx += 0.1;  // Move closer
+    if (ballRange < minRange)
+        vx -= 0.1;  // Move away
+    vy = s * dir * cos(ballYaw);
+    vtheta = (ballYaw - dir * s) / r;
+
+    // Apply limits
+    vx = cap(vx, vxLimit, -vxLimit);
+    vy = cap(vy, vyLimit, -vyLimit);
+    vtheta = cap(vtheta, vthetaLimit, -vthetaLimit);
+
+    brain->client->setVelocity(vx, vy, vtheta);
     return NodeStatus::SUCCESS;
 }
 
