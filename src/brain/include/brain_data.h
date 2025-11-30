@@ -34,6 +34,7 @@ public:
     bool ballDetected = false;    // Whether the camera has detected the ball
     GameObject ball;              // Records the ball's information, including position, bounding box, etc.
     double robotBallAngleToField; // The angle between the robot's vector to the ball and the X-axis in the field coordinate system, (-PI, PI]
+    double kickDir = 0.0;         // The target direction for kicking in field coordinates
 
     // 起身
     RobotRecoveryState recoveryState = RobotRecoveryState::IS_READY;

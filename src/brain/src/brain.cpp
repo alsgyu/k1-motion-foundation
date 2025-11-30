@@ -47,19 +47,43 @@ void Brain::tick()
     tree->tick();
 }
 
+
 void Brain::updateBallMemory()
 {
-    data->ball.range = sqrt(data->ball.posToRobot.x * data->ball.posToRobot.x + data->ball.posToRobot.y * data->ball.posToRobot.y);
-    tree->setEntry<double>("ball_range", data->ball.range);
-    data->ball.yawToRobot = atan2(data->ball.posToRobot.y, data->ball.posToRobot.x);
-    data->ball.pitchToRobot = asin(config->robotHeight / data->ball.range);
 
-    // mark ball as lost if long time no see
-    if (get_clock()->now().seconds() - data->ball.timePoint.seconds() > config->memoryLength)
-    {
+    double secs = msecsSince(data->ball.timePoint) / 1000;
+    
+    double ballMemTimeout;
+    get_parameter("strategy.ball_memory_timeout", ballMemTimeout);
+
+    if (secs > ballMemTimeout) 
+    { 
         tree->setEntry<bool>("ball_location_known", false);
-        data->ballDetected = false;
+        tree->setEntry<bool>("ball_out", false); 
     }
+
+    
+    updateRelativePos(data->ball);
+    updateRelativePos(data->tmBall);
+    tree->setEntry<double>("ball_range", data->ball.range);
+
+
+
+    log->setTimeNow();
+    log->logBall(
+        "field/ball", 
+        data->ball.posToField, 
+        data->ballDetected ? 0x00FF00FF : 0x006600FF,
+        data->ballDetected,
+        tree->getEntry<bool>("ball_location_known")
+        );
+    log->logBall(
+        "field/tmBall", 
+        data->tmBall.posToField, 
+        0xFFFF00FF,
+        tree->getEntry<bool>("tm_ball_pos_reliable"),
+        tree->getEntry<bool>("tm_ball_pos_reliable")
+        );
 }
 
 void Brain::detectionsCallback(const vision_interface::msg::Detections &msg)
